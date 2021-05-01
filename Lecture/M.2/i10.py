@@ -10,6 +10,8 @@ p = [5, 4, 4, 6, 4, 7, 4, 5, 7, 3]
 b = 20
 
 # import model and solve
-import knapsackmodel
-knapsackmodel.solve(a, p, b)
+# import knapsackmodel
+# knapsackmodel.solve(a, p, b)
 
+import knapsack_longest
+knapsack_longest.solve(a, p, b)

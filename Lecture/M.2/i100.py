@@ -10,7 +10,10 @@ p = [13, 10, 10, 16, 15, 19, 12, 15, 17, 12, 11, 19, 8, 7, 19, 7, 11, 18, 14, 17
 b = 300
 
 # import model and solve
-import knapsackmodel
-knapsackmodel.solve(a, p, b)
+# import knapsackmodel
+# knapsackmodel.solve(a, p, b)
+
+import knapsack_longest
+knapsack_longest.solve(a, p, b)
 
 
