@@ -8,7 +8,7 @@ def solve(a, p, b):
 
     n = len(a)
 
-    V = []
+    V = set()
     E = []
     s = (0,0)
     t = (b,n)
@@ -16,22 +16,20 @@ def solve(a, p, b):
     for i in range(1, n + 1):
         for c in range(0, b + 1 - a[i - 1]):
             E.append(((c, i - 1), (c + a[i - 1], i), p[i - 1]))
-            V.append((c, i - 1))
-            V.append((c + a[i - 1], i))
+            V.add((c, i - 1))
+            V.add((c + a[i - 1], i))
 
     for i in range(1, n + 1):
         for c in range(0, b + 1):
             E.append(((c, i - 1), (c, i), 0))
-            V.append((c, i - 1))
-            V.append((c, i))
+            V.add((c, i - 1))
+            V.add((c, i))
 
     for i in range(0, n + 1):
         for c in range(0, b):
             E.append(((c, i), (c + 1, i), 0))
-            V.append((c, i))
-            V.append((c + 1, i))
-
-    V = list(set(V))
+            V.add((c, i))
+            V.add((c + 1, i))
 
     # a binary variable per item (selected or not); gives profit if selected
     x = {}
