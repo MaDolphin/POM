@@ -13,18 +13,24 @@ def solve(a, p, b):
     s = (0,0)
     t = (b,n)
 
+    # item arcs ((c, i − 1),(c + a[i], i)) for i = 1, . . . , n, c = 0, . . . , b − a[i];
+    # using one of these arcs represents packing item i into the knapsack
     for i in range(1, n + 1):
         for c in range(0, b + 1 - a[i - 1]):
             E.append(((c, i - 1), (c + a[i - 1], i), p[i - 1]))
             V.add((c, i - 1))
             V.add((c + a[i - 1], i))
 
+    # skip arcs ((c, i − 1),(c, i)), for i = 1, . . . , n, c = 0, . . . , b;
+    # using one of these arcs represents not packing item i
     for i in range(1, n + 1):
         for c in range(0, b + 1):
             E.append(((c, i - 1), (c, i), 0))
             V.add((c, i - 1))
             V.add((c, i))
 
+    # waste arcs ((c, i),(c + 1, i)) for i = 0, . . . , n, c = 0, . . . , b − 1
+    # using one of these arcs represents leaving the c’th unit of capacity
     for i in range(0, n + 1):
         for c in range(0, b):
             E.append(((c, i), (c + 1, i), 0))
