@@ -6,7 +6,11 @@ def solve(a, p, b):
     items = range(nitems)
     s = (0, 0)
     t = (b + 1, nitems)
-    a = [i + 1 for i in a]
+
+    # a = [i + 1 for i in a]
+    for i in items:
+        a[i] = a[i] + 1
+
 
     # Do not change the following line!
     vertices = [(c, i) for i in range(nitems+1) for c in range(b+2)]
