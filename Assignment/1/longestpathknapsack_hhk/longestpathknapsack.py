@@ -8,8 +8,9 @@ def solve(a, p, b):
     t = (b + 1, nitems)
 
     # a = [i + 1 for i in a]
+    size = a.copy()
     for i in items:
-        a[i] = a[i] + 1
+        size[i] = size[i] + 1
 
 
     # Do not change the following line!
@@ -20,8 +21,8 @@ def solve(a, p, b):
     # item arcs ((c, i − 1),(c + a[i], i)) for i = 1, . . . , n, c = 0, . . . , b + 1 − a[i];
     # using one of these arcs represents packing item i into the knapsack
     for i in range(1, nitems + 1):
-        for c in range(0, b + 2 - a[i - 1]):
-            arcs.append([(c, i - 1), (c + a[i - 1], i), p[i - 1]])
+        for c in range(0, b + 2 - size[i - 1]):
+            arcs.append([(c, i - 1), (c + size[i - 1], i), p[i - 1]])
 
     # skip arcs ((c, i − 1),(c, i)), for i = 1, . . . , n, c = 0, . . . , b + 1;
     # using one of these arcs represents not packing item i
