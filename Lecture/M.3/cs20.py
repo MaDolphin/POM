@@ -17,11 +17,11 @@ l = [5, 6, 6, 9, 5, 9, 7, 8, 8, 6, 5, 9, 5, 9, 6, 8, 9, 9, 7, 7]
 m = 82
 
 
-import cuttingstockmodel
-cuttingstockmodel.solve(m, L, d, l)
+# import cuttingstockmodel
+# cuttingstockmodel.solve(m, L, d, l)
 
 
-"""
+
 import csflowmodel
 csflowmodel.solve(m, L, d, l)
-"""
+

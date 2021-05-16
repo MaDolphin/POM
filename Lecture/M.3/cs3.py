@@ -11,12 +11,12 @@ l = [7, 3, 4]
 m = 10 #number of available (raw) rolls (=known upper bound on the optimum) 
 
 
-import cuttingstockmodel
-cuttingstockmodel.solve(m, L, d, l)
+# import cuttingstockmodel
+# cuttingstockmodel.solve(m, L, d, l)
 
 
-"""
+
 import csflowmodel
 csflowmodel.solve(m, L, d, l)
-"""
+
 
