@@ -30,11 +30,11 @@ def data_load(fileName):
     df_cities = dataFrame[2]
     df_cities_minimum = dataFrame[3]
 
-    for i in dataFrame:
-        print(i)
-
     return df_hospitals, df_existing_hospitals, df_cities, df_cities_minimum
 
+def solve(fileName):
+    df_hospitals, df_existing_hospitals, df_cities, df_cities_minimum = data_load(fileName)
 
+    model = Model("Hospitalnetwork")
+    return model
 
-data_load(fileName)
