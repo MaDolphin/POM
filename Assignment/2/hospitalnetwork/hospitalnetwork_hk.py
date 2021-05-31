@@ -17,13 +17,18 @@ def data_load(fileName):
                     dataFrame.append(df_temp)
                     # print(df_temp)
                     del df_temp
-                str = line.split(":")[1]
-                df_temp = pd.DataFrame(columns = str.split(","))
+                str = line.split(": ")[1].replace(',\n', '')
+                df_temp = pd.DataFrame(columns = str.split(", "))
             else:
-                val = line.split(",")
+                line = line.replace(',\n', '')
+                val = line.split(", ")
                 df_temp_length = len(df_temp)
                 df_temp.loc[df_temp_length] = val
         dataFrame.append(df_temp)
+
+    for i in range(len(dataFrame)):
+        dataFrame[i] = dataFrame[i].set_index('loc_id', drop=False)
+        print(dataFrame[i])
 
     df_hospitals = dataFrame[0]
     df_existing_hospitals = dataFrame[1]
@@ -38,3 +43,4 @@ def solve(fileName):
     model = Model("Hospitalnetwork")
     return model
 
+solve(fileName)
