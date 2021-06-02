@@ -75,13 +75,6 @@ def solve(full_path_instance):
         for k in range(3):
             y[j, k] = model.addVar(name="t_%s_%s" % (j, k), vtype=GRB.BINARY)
 
-    # Maximum Cost C
-    C_max = model.addVar(vtype=GRB.CONTINUOUS)
-
-    model.setObjective(
-        C_max, GRB.MINIMIZE
-    )
-
     ############################################################################################
 
     for i in cities:
@@ -106,11 +99,8 @@ def solve(full_path_instance):
                                                df_cities.loc[i]['x_coord'], df_cities.loc[i]['y_coord']) *
                             x[j,i] * y[j,2] <= 30)
 
-    # for i in cities_minimum:
-    #     model.addConstr(quicksum(x[j,i] * quicksum(y[j,k] for k in [1,2]) for j in hospitals) == 1)
-
     for i in cities_minimum:
-        model.addConstr(quicksum(x[j,i] * y[j,0] for j in hospitals) == 0)
+        model.addConstr(quicksum(x[j,i] * quicksum(y[j,k] for k in [1,2]) for j in hospitals) == 1)
 
     for j in hospitals:
         for k in types_hospitals:
