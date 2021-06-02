@@ -40,6 +40,13 @@ def data_load(fileName):
 def euclidean_distance(x1,y1,x2,y2):
     return math.sqrt((int(x1) - int(x2))**2 + (int(y1) - int(y2))**2)
 
+# def check_distance(hospitals, cities):
+#     res = [(hos_id, cit_id)]
+#     if dist > 30:
+#         continue
+#     return [x_i_j]
+
+
 def solve(full_path_instance):
     df_hospitals, df_existing_hospitals, df_cities, df_cities_minimum = data_load(full_path_instance)
 
@@ -54,7 +61,7 @@ def solve(full_path_instance):
 
     ############################################################################################
     model = Model("Hospitalnetwork")
-    # model.modelSense = GRB.MINIMIZE
+    model.modelSense = GRB.MINIMIZE
 
     # whether hospital j for city i is used (value = 1) or not (value = 0).
     x = {}
@@ -109,9 +116,23 @@ def solve(full_path_instance):
         for k in types_hospitals:
             model.addConstr(quicksum(x[j,i] * y[j,k] for i in cities) <= int(df_hospitals_cap.loc[j][k]))
 
-    model.addConstr(quicksum(x[j,i] * y[j,k] * int(df_hospitals_cost.loc[j][k]) for i in cities for j in hospitals for k in types_hospitals) +
-                    quicksum( - (1 - quicksum(y[j,k] for k in types_hospitals)) * int(df_existing_hospitals.loc[j]['closing_income']) for j in existing_hospitals) <= C_max)
-
+    model.setObjective(quicksum(x[j,i] * y[j,k] * int(df_hospitals_cost.loc[j][k]) for i in cities for j in hospitals for k in types_hospitals) +
+                    quicksum( - (1 - quicksum(y[j,k] for k in types_hospitals)) * int(df_existing_hospitals.loc[j]['closing_income']) for j in existing_hospitals))
+    
+    # model.setObjective(
+    # quicksum(
+    #     x[j,i] * y[j,k] * int(df_hospitals_cost.loc[j][k]) 
+    #     for j in hospitals
+    #     for i in cities
+    #     for k in types_hospitals
+    #     )
+    # -
+    # quicksum( 
+    #     ( 
+    #         quicksum( (1 - y[j,k]) for k in types_hospitals)) * df_existing_hospitals.loc[j]['closing_income']  
+    #         for j in existing_hospitals )
+    # )
+    
     ############################################################################################
     model.update()
     model.optimize()
