@@ -28,7 +28,7 @@ def data_load(fileName):
 
     for i in range(len(dataFrame)):
         dataFrame[i] = dataFrame[i].set_index('loc_id', drop=False)
-        print(dataFrame[i])
+        # print(dataFrame[i])
 
     df_hospitals = dataFrame[0]
     df_existing_hospitals = dataFrame[1]
@@ -37,10 +37,85 @@ def data_load(fileName):
 
     return df_hospitals, df_existing_hospitals, df_cities, df_cities_minimum
 
-def solve(fileName):
-    df_hospitals, df_existing_hospitals, df_cities, df_cities_minimum = data_load(fileName)
+def euclidean_distance(x1,y1,x2,y2):
+    return math.sqrt((int(x1) - int(x2))**2 + (int(y1) - int(y2))**2)
 
+def solve(full_path_instance):
+    df_hospitals, df_existing_hospitals, df_cities, df_cities_minimum = data_load(full_path_instance)
+
+    df_hospitals_cost = df_hospitals[['costk1', 'costk2', 'costk3']]
+    df_hospitals_cap = df_hospitals[['capk1', 'capk2', 'capk3']]
+
+    hospitals = df_hospitals.index.to_list() # J
+    cities = df_cities.index.to_list() # I
+    existing_hospitals = df_existing_hospitals.index.to_list() # J_2
+    cities_minimum = df_cities_minimum.index.to_list() # I_2
+    types_hospitals = range(3)
+
+    ############################################################################################
     model = Model("Hospitalnetwork")
+    # model.modelSense = GRB.MINIMIZE
+
+    # whether hospital j for city i is used (value = 1) or not (value = 0).
+    x = {}
+    for j in hospitals:
+        for i in cities:
+            x[j, i] = model.addVar(name="x_%s_%s" % (j, i), vtype=GRB.BINARY)
+
+    # which type k of hospital j in {1,2,3} is used (value = 1) or not (value = 0).
+    y = {}
+    for j in hospitals:
+        for k in range(3):
+            y[j, k] = model.addVar(name="t_%s_%s" % (j, k), vtype=GRB.BINARY)
+
+    # Maximum Cost C
+    C_max = model.addVar(vtype=GRB.CONTINUOUS)
+
+    model.setObjective(
+        C_max, GRB.MINIMIZE
+    )
+
+    ############################################################################################
+
+    for i in cities:
+        model.addConstr(quicksum(x[j,i] for j in hospitals) == 1)
+
+    for j in hospitals:
+        for i in cities:
+            model.addConstr(x[j,i] <= quicksum(y[j,k] for k in types_hospitals))
+
+    for j in hospitals:
+        model.addConstr(quicksum(y[j,k] for k in types_hospitals) <= 1)
+
+    for j in hospitals:
+        for i in cities:
+            model.addConstr(euclidean_distance(df_hospitals.loc[j]['x_coord'], df_hospitals.loc[j]['y_coord'],
+                                               df_cities.loc[i]['x_coord'], df_cities.loc[i]['y_coord']) *
+                            x[j,i] * y[j,0] <= 20)
+            model.addConstr(euclidean_distance(df_hospitals.loc[j]['x_coord'], df_hospitals.loc[j]['y_coord'],
+                                               df_cities.loc[i]['x_coord'], df_cities.loc[i]['y_coord']) *
+                            x[j,i] * y[j,1] <= 20)
+            model.addConstr(euclidean_distance(df_hospitals.loc[j]['x_coord'], df_hospitals.loc[j]['y_coord'],
+                                               df_cities.loc[i]['x_coord'], df_cities.loc[i]['y_coord']) *
+                            x[j,i] * y[j,2] <= 30)
+
+    # for i in cities_minimum:
+    #     model.addConstr(quicksum(x[j,i] * quicksum(y[j,k] for k in [1,2]) for j in hospitals) == 1)
+
+    for i in cities_minimum:
+        model.addConstr(quicksum(x[j,i] * y[j,0] for j in hospitals) == 0)
+
+    for j in hospitals:
+        for k in types_hospitals:
+            model.addConstr(quicksum(x[j,i] * y[j,k] for i in cities) <= int(df_hospitals_cap.loc[j][k]))
+
+    model.addConstr(quicksum(x[j,i] * y[j,k] * int(df_hospitals_cost.loc[j][k]) for i in cities for j in hospitals for k in types_hospitals) +
+                    quicksum( - (1 - quicksum(y[j,k] for k in types_hospitals)) * int(df_existing_hospitals.loc[j]['closing_income']) for j in existing_hospitals) <= C_max)
+
+    ############################################################################################
+    model.update()
+    model.optimize()
+
     return model
 
 solve(fileName)
