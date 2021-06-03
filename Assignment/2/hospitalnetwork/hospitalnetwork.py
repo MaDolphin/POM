@@ -4,8 +4,6 @@ import math
 import re
 import pandas as pd
 
-fileName = "data1.csv"
-
 def data_load(fileName):
     dataFrame = []
     df_temp = pd.DataFrame
@@ -27,7 +25,7 @@ def data_load(fileName):
         dataFrame.append(df_temp)
 
     for i in range(len(dataFrame)):
-        dataFrame[i] = dataFrame[i].set_index('loc_id', drop=False)
+        dataFrame[i] = dataFrame[i].set_index('loc_id', drop=True)
         # print(dataFrame[i])
 
     df_hospitals = dataFrame[0]
@@ -39,13 +37,6 @@ def data_load(fileName):
 
 def euclidean_distance(x1,y1,x2,y2):
     return math.sqrt((int(x1) - int(x2))**2 + (int(y1) - int(y2))**2)
-
-# def check_distance(hospitals, cities):
-#     res = [(hos_id, cit_id)]
-#     if dist > 30:
-#         continue
-#     return [x_i_j]
-
 
 def solve(full_path_instance):
     df_hospitals, df_existing_hospitals, df_cities, df_cities_minimum = data_load(full_path_instance)
@@ -73,7 +64,7 @@ def solve(full_path_instance):
     y = {}
     for j in hospitals:
         for k in range(3):
-            y[j, k] = model.addVar(name="t_%s_%s" % (j, k), vtype=GRB.BINARY)
+            y[j, k] = model.addVar(name="y_%s_%s" % (j, k), vtype=GRB.BINARY)
 
     ############################################################################################
 
@@ -106,27 +97,32 @@ def solve(full_path_instance):
         for k in types_hospitals:
             model.addConstr(quicksum(x[j,i] * y[j,k] for i in cities) <= int(df_hospitals_cap.loc[j][k]))
 
-    model.setObjective(quicksum(x[j,i] * y[j,k] * int(df_hospitals_cost.loc[j][k]) for i in cities for j in hospitals for k in types_hospitals) +
-                    quicksum( - (1 - quicksum(y[j,k] for k in types_hospitals)) * int(df_existing_hospitals.loc[j]['closing_income']) for j in existing_hospitals))
-    
-    # model.setObjective(
-    # quicksum(
-    #     x[j,i] * y[j,k] * int(df_hospitals_cost.loc[j][k]) 
-    #     for j in hospitals
-    #     for i in cities
-    #     for k in types_hospitals
-    #     )
-    # -
-    # quicksum( 
-    #     ( 
-    #         quicksum( (1 - y[j,k]) for k in types_hospitals)) * df_existing_hospitals.loc[j]['closing_income']  
-    #         for j in existing_hospitals )
-    # )
+    model.setObjective(
+        quicksum(y[j,k] * int(df_hospitals_cost.loc[j][k]) for j in hospitals for k in types_hospitals) -
+        quicksum( (1 - quicksum(y[j,k] for k in types_hospitals)) * int(df_existing_hospitals.loc[j]['closing_income']) for j in existing_hospitals)
+    )
     
     ############################################################################################
     model.update()
+    # model.write('Hospitalnetwork.lp')
     model.optimize()
+
+    # Printing solution and objective value
+    def printSolution():
+        if model.status == GRB.OPTIMAL:
+            print('\n objective: %g\n' % model.ObjVal)
+            print("Selected following matching:")
+            for j in hospitals:
+                for i in cities:
+                    for k in types_hospitals:
+                        if x[j,i].x == 1 and y[j,k].x == 1:
+                            print((j,i,k+1,euclidean_distance(df_hospitals.loc[j]['x_coord'], df_hospitals.loc[j]['y_coord'],
+                                               df_cities.loc[i]['x_coord'], df_cities.loc[i]['y_coord'])))
+        else:
+            print("No solution!")
+
+    printSolution()
 
     return model
 
-solve(fileName)
+solve('data1.csv')
