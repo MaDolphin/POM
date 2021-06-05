@@ -66,7 +66,8 @@ def solve(full_path_instance):
     #all reasonable (j, i) pairs
     id_pairs = check_dist(df_hospitals, df_cities)
     print(id_pairs)
-    # # pair_map : city : hospitals
+
+    # pair_map : city : hospitals
     city_pairs = {}
     for (j,i) in id_pairs:
         if i not in city_pairs:
@@ -74,7 +75,8 @@ def solve(full_path_instance):
         else:
             city_pairs[i].append(j)
     print(city_pairs)
-    # pair_map : hospital : cities     
+
+    # pair_map : hospital : cities
     hospitals_pairs = {}
     for (j,i) in id_pairs:
         if j not in hospitals_pairs:
@@ -98,12 +100,12 @@ def solve(full_path_instance):
 
     # which type k of hospital j in {1,2,3} is used (value = 1) or not (value = 0).
     y = {}
-    for j in hospitals:
+    for j in hospitals_pairs.keys(): # j in hospitals
         for k in range(3):
             y[j, k] = model.addVar(name="y_%s_%s" % (j, k), vtype=GRB.BINARY)
 
     ############################################################################################
-    for i in cities:
+    for i in city_pairs.keys(): # i in cities
         # model.addConstr(quicksum(x[j,i] for j in hospitals) == 1)
         model.addConstr(quicksum(x[j,i] for j in city_pairs[i]) == 1)
 
@@ -113,7 +115,7 @@ def solve(full_path_instance):
             if (j,i) in id_pairs:
                 model.addConstr(x[j,i] <= quicksum(y[j,k] for k in types_hospitals))
 
-    for j in hospitals:
+    for j in hospitals_pairs.keys(): # j in hospitals
         model.addConstr(quicksum(y[j,k] for k in types_hospitals) <= 1)
 
     for j in hospitals:
@@ -150,7 +152,7 @@ def solve(full_path_instance):
     
     ############################################################################################
     model.update()
-    # model.write('Hospitalnetwork.lp')
+    # model.write('hospitalnetwork.lp')
     model.optimize()
 
     # Printing solution and objective value
