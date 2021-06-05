@@ -38,18 +38,18 @@ def data_load(fileName):
 def euclidean_distance(x1,y1,x2,y2):
     return math.sqrt((int(x1) - int(x2))**2 + (int(y1) - int(y2))**2)
 
-# def check_dist(df_hospitals, df_cities):
-#     id_pairs = []
-#     hospitals = df_hospitals.index.to_list() # J
-#     cities = df_cities.index.to_list() # I
-#     for i in cities:
-#         for j in hospitals:
-#             x_1, y_1 = df_hospitals.loc[j]['x_coord'], df_hospitals.loc[j]['y_coord']
-#             x_2, y_2 = df_cities.loc[i]['x_coord'], df_cities.loc[i]['y_coord']
-#             dist = euclidean_distance(x_1, y_1, x_2, y_2)
-#             if dist <= 30:
-#                 id_pairs.append((j , i))
-#     return id_pairs
+def check_dist(df_hospitals, df_cities):
+    id_pairs = []
+    hospitals = df_hospitals.index.to_list() # J
+    cities = df_cities.index.to_list() # I
+    for i in cities:
+        for j in hospitals:
+            x_1, y_1 = df_hospitals.loc[j]['x_coord'], df_hospitals.loc[j]['y_coord']
+            x_2, y_2 = df_cities.loc[i]['x_coord'], df_cities.loc[i]['y_coord']
+            dist = euclidean_distance(x_1, y_1, x_2, y_2)
+            if dist <= 30:
+                id_pairs.append((j , i))
+    return id_pairs
 
 def solve(full_path_instance):
     df_hospitals, df_existing_hospitals, df_cities, df_cities_minimum = data_load(full_path_instance)
@@ -64,25 +64,25 @@ def solve(full_path_instance):
     types_hospitals = range(3)
     
     #all reasonable (j, i) pairs
-    # id_pairs = check_dist(df_hospitals, df_cities)
-    
+    id_pairs = check_dist(df_hospitals, df_cities)
+    print(id_pairs)
     # # pair_map : city : hospitals
-    # city_pairs = {}
-    # for (j,i) in id_pairs:
-    #     if j not in city_pairs:
-    #         city_pairs[i] = [j]
-    #     else:
-    #         city_pairs[i].append(j)
-    # print(city_pairs)
-    # # pair_map : hospital : cities     
-    # hospitals_pairs = {}
-    # for (j,i) in id_pairs:
-    #     if j not in hospitals_pairs:
-    #         hospitals_pairs[j] = [i]
-    #     else:
-    #         hospitals_pairs[j].append(i)
+    city_pairs = {}
+    for (j,i) in id_pairs:
+        if i not in city_pairs:
+            city_pairs[i] = [j]
+        else:
+            city_pairs[i].append(j)
+    print(city_pairs)
+    # pair_map : hospital : cities     
+    hospitals_pairs = {}
+    for (j,i) in id_pairs:
+        if j not in hospitals_pairs:
+            hospitals_pairs[j] = [i]
+        else:
+            hospitals_pairs[j].append(i)
             
-    # print(hospitals_pairs)
+    print(hospitals_pairs)
     
     ############################################################################################
     model = Model("Hospitalnetwork")
@@ -93,8 +93,8 @@ def solve(full_path_instance):
     for j in hospitals:
         for i in cities:
             # add check constraints
-            # if (j,i) in id_pairs:
-            x[j, i] = model.addVar(name="x_%s_%s" % (j, i), vtype=GRB.BINARY)
+            if (j,i) in id_pairs:
+                x[j, i] = model.addVar(name="x_%s_%s" % (j, i), vtype=GRB.BINARY)
 
     # which type k of hospital j in {1,2,3} is used (value = 1) or not (value = 0).
     y = {}
@@ -104,14 +104,14 @@ def solve(full_path_instance):
 
     ############################################################################################
     for i in cities:
-        model.addConstr(quicksum(x[j,i] for j in hospitals) == 1)
-        # model.addConstr(quicksum(x[j,i] for j in city_pairs[i]) == 1)
+        # model.addConstr(quicksum(x[j,i] for j in hospitals) == 1)
+        model.addConstr(quicksum(x[j,i] for j in city_pairs[i]) == 1)
 
     for j in hospitals:
         for i in cities:
             # add check constraints
-            # if (j,i) in id_pairs:
-            model.addConstr(x[j,i] <= quicksum(y[j,k] for k in types_hospitals))
+            if (j,i) in id_pairs:
+                model.addConstr(x[j,i] <= quicksum(y[j,k] for k in types_hospitals))
 
     for j in hospitals:
         model.addConstr(quicksum(y[j,k] for k in types_hospitals) <= 1)
@@ -119,27 +119,28 @@ def solve(full_path_instance):
     for j in hospitals:
         for i in cities:
             # add check constraints
-            # if (j,i) in id_pairs:
-            model.addConstr(euclidean_distance(df_hospitals.loc[j]['x_coord'], df_hospitals.loc[j]['y_coord'],
-                                            df_cities.loc[i]['x_coord'], df_cities.loc[i]['y_coord']) *
-                            x[j,i] * y[j,0] <= 20)
-            model.addConstr(euclidean_distance(df_hospitals.loc[j]['x_coord'], df_hospitals.loc[j]['y_coord'],
-                                            df_cities.loc[i]['x_coord'], df_cities.loc[i]['y_coord']) *
-                            x[j,i] * y[j,1] <= 20)
-            model.addConstr(euclidean_distance(df_hospitals.loc[j]['x_coord'], df_hospitals.loc[j]['y_coord'],
-                                            df_cities.loc[i]['x_coord'], df_cities.loc[i]['y_coord']) *
-                            x[j,i] * y[j,2] <= 30)
+            if (j,i) in id_pairs:
+                model.addConstr(euclidean_distance(df_hospitals.loc[j]['x_coord'], df_hospitals.loc[j]['y_coord'],
+                                                df_cities.loc[i]['x_coord'], df_cities.loc[i]['y_coord']) *
+                                x[j,i] * y[j,0] <= 20)
+                model.addConstr(euclidean_distance(df_hospitals.loc[j]['x_coord'], df_hospitals.loc[j]['y_coord'],
+                                                df_cities.loc[i]['x_coord'], df_cities.loc[i]['y_coord']) *
+                                x[j,i] * y[j,1] <= 20)
+                model.addConstr(euclidean_distance(df_hospitals.loc[j]['x_coord'], df_hospitals.loc[j]['y_coord'],
+                                                df_cities.loc[i]['x_coord'], df_cities.loc[i]['y_coord']) *
+                                x[j,i] * y[j,2] <= 30)
 
     for i in cities_minimum:
-        model.addConstr(quicksum(x[j,i] * quicksum(y[j,k] for k in [1,2]) for j in hospitals) == 1)
-        #model.addConstr(quicksum(x[j,i] * quicksum(y[j,k] for k in [1,2]) for j in city_pairs[i]) == 1)
+        # model.addConstr(quicksum(x[j,i] * quicksum(y[j,k] for k in [1,2]) for j in hospitals) == 1)
+        model.addConstr(quicksum(x[j,i] * quicksum(y[j,k] for k in [1,2]) for j in city_pairs[i]) == 1)
 
-    for j in hospitals:
-        for k in types_hospitals:
-            model.addConstr(quicksum(x[j,i] * y[j,k] for i in cities) <= int(df_hospitals_cap.loc[j][k]))
-    # for j in hospitals_pairs.keys():
+    # for j in hospitals:
     #     for k in types_hospitals:
-    #         model.addConstr(quicksum(x[j,i] * y[j,k] for i in hospitals_pairs[j]) <= int(df_hospitals_cap.loc[j][k]))
+    #         model.addConstr(quicksum(x[j,i] * y[j,k] for i in cities) <= int(df_hospitals_cap.loc[j][k]))
+    for j in hospitals_pairs.keys():
+        for k in types_hospitals:
+            model.addConstr(quicksum(x[j,i] * y[j,k] for i in hospitals_pairs[j]) <= int(df_hospitals_cap.loc[j][k]))
+
 
     model.setObjective(
         quicksum(y[j,k] * int(df_hospitals_cost.loc[j][k]) for j in hospitals for k in types_hospitals) -
@@ -159,10 +160,12 @@ def solve(full_path_instance):
             print("Selected following matching:")
             for j in hospitals:
                 for i in cities:
-                    for k in types_hospitals:
-                        if x[j,i].x == 1 and y[j,k].x == 1:
-                            print((j,i,k+1,euclidean_distance(df_hospitals.loc[j]['x_coord'], df_hospitals.loc[j]['y_coord'],
-                                               df_cities.loc[i]['x_coord'], df_cities.loc[i]['y_coord'])))
+                    # add constraints
+                    if (j,i) in id_pairs:
+                        for k in types_hospitals:
+                            if x[j,i].x == 1 and y[j,k].x == 1:
+                                print((j,i,k+1,euclidean_distance(df_hospitals.loc[j]['x_coord'], df_hospitals.loc[j]['y_coord'],
+                                                df_cities.loc[i]['x_coord'], df_cities.loc[i]['y_coord'])))
         else:
             print("No solution!")
 
@@ -170,4 +173,4 @@ def solve(full_path_instance):
 
     return model
 
-solve('data2.csv')
+solve('data1.csv')
