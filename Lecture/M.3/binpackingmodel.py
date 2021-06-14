@@ -31,9 +31,9 @@ def solve(nbins, weight, capacity):
     model.addConstr(quicksum(x[i, j] for j in bins) == 1)
 
   # redundant Constraints help to improve the performance of calculating
-  for j in bins:
-    for i in items:
-      model.addConstr(x[i,j] <= y[j])
+  # for j in bins:
+  #   for i in items:
+  #     model.addConstr(x[i,j] <= y[j])
 
   # Solve
   model.optimize()

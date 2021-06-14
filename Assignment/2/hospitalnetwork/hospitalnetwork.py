@@ -56,7 +56,7 @@ def solve(full_path_instance):
 
     df_hospitals_cost = df_hospitals[['costk1', 'costk2', 'costk3']]
     df_hospitals_cap = df_hospitals[['capk1', 'capk2', 'capk3']]
-
+    #test
     hospitals = df_hospitals.index.to_list() # J
     cities = df_cities.index.to_list() # I
     existing_hospitals = df_existing_hospitals.index.to_list() # J_2

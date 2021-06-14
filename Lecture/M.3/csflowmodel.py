@@ -1,57 +1,70 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon May  7 18:31:01 2018
+Last modified 2020
+
+@author: luebbecke
+"""
+
 from gurobipy import *
 
-def solve(m, L, demands, lengths):
-    # The number of orders
-    n = len(demands)
-    orders = range(n)
 
-    model = Model('Сutting stock Flow')
-    model.modelSense = GRB.MINIMIZE
+# this is a flow based model for cutting stock. A cutting pattern is represented as a path in a graph
+# that contains nodes for each capacity unit of the raw roll.
 
-    vertices = [i for i in range(-1, L + 1)]
-    arcs = []
-    arcs_1_i = []
-    arcs_2 = []
-    arcs_temp = []
 
-    for i in orders:
-        for k in range(L - lengths[i] + 1):
-            arc = [(k, k + lengths[i]), lengths[i]]
-            arcs_1_i.append(arc)
+def solve(m, L, d, l):
+    # number of orders
+    n = len(d)
 
-    for k in range(L):
-        arc = [(k, k + 1), 0]
-        arcs_2.append(arc)
+    # "colored" edges, representing cutting orders
+    A1 = []
+    for i in range(n):
+        A1temp = []
+        for v in range(0, L - l[i] + 1):
+            A1temp.append((v, v + l[i]))
+        A1.append(A1temp)
 
-    arcs = arcs_1_i + arcs_2
-    arcs.append([(-1,0),m])
+        # "black" edges, representing "wasted" capacity
+    A2 = []
+    for v in range(-1, L):  # node "-1" is the start node
+        A2.append((v, v + 1))
 
-    def fun_arcs_1_i(i):
-        arcs_temp.clear()
-        for k in range(L - lengths[i] + 1):
-            arc = [(k, k + lengths[i]), lengths[i]]
-            arcs_temp.append(arc)
-        return arcs_temp
+    model = Model("CS flow model")
 
-    x = {}
-    for arc in arcs:
-        x[arc[0]] = model.addVar(name="x_(%s,%s)" % (arc[0][0],arc[0][1]),
-                                 vtype = GRB.INTEGER,
-                                 obj = arc[1])
-    # model.setObjective(
-    #     x[(-1,0)], GRB.MINIMIZE
-    # )
+    x1 = {}
+    for i in range(n):
+        for e in A1[i]:
+            x1[i, e] = model.addVar(name="x1_" + str(i) + "_" + str(e), vtype=GRB.CONTINUOUS, obj=0.0)
 
-    for i in orders:
-        model.addConstr(quicksum(x[arc[0]] for arc in fun_arcs_1_i(i)) >= demands[i])
+    x2 = {}
+    for e in A2:
+        if e[0] == -1:
+            objcoeff = 1.0
+        else:
+            objcoeff = 0.0
+        x2[e] = model.addVar(name="x2_" + str(e), vtype=GRB.INTEGER, obj=objcoeff)
 
-    for v in vertices:
-        if v != -1 and v != L:
-            model.addConstr(quicksum(x[(i,j)] for (i,j) in arcs if i == v) -
-                            quicksum(x[(j,i)] for (j,i) in arcs if i == v) == 0)
+    # flow conservation in node v
+    for v in range(L):
+        model.addConstr(  # flow into v
+            quicksum(x1[i, e] for i in range(n) for e in A1[i] if e[1] == v) +
+            quicksum(x2[e] for e in A2 if e[1] == v) -
+            # flow out of v
+            quicksum(x1[i, e] for i in range(n) for e in A1[i] if e[0] == v) -
+            quicksum(x2[e] for e in A2 if e[0] == v) == 0)
 
-    model.update()
+    # satisfy demands
+    for i in range(n):
+        model.addConstr(quicksum(x1[i, e] for e in A1[i]) >= d[i])
+
+    # model.write("csflow.lp")
     model.optimize()
 
-    # Do not modify the code below this line
-    return model
+    # solve LP relaxation    
+#    r = model.relax()
+#    r.optimize()
+
+
+

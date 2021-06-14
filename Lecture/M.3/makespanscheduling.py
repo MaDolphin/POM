@@ -27,7 +27,7 @@ def solve(nmachine, ntime, capacity):
     model.addConstr(quicksum(x[j, k] * ntime[j] for j in jobs) <= C_max)
 
 # only for bpp-400s-150
-#   model.addConstr(C_max <= 70)
+  model.addConstr(C_max <= 70)
 
   model.optimize()
 
