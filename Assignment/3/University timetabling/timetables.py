@@ -10,6 +10,10 @@ def data_load(fileName):
     start_flag = False
     with open(fileName, "r") as file:
         for line in file:
+            if line.find('Days') > -1:
+                days = int(line.split(":")[1])
+            if line.find('Periods_per_day') > -1:
+                periods = int(line.split(":")[1])
             if line.strip() == "":
                 if list_temp:
                     listSet.append(list_temp.copy())
@@ -41,36 +45,42 @@ def data_load(fileName):
         dict_curricula[item[0]] = dict_temp.copy()
         dict_temp.clear()
 
-    return df_courses, df_rooms, dict_curricula, df_unavailability_constraints
+    return df_courses, df_rooms, dict_curricula, df_unavailability_constraints, days, periods
 
 
 def solve(full_path_instance):
+    df_courses, df_rooms, dict_curricula, df_unavailability_constraints, days, periods = data_load(full_path_instance)
+    print(days)
+    print(periods)
+
+
+
     model = Model("Timetables")
 
     ############################################################################################
-    model.update()
-    # model.write('Timetables.lp')
-    model.optimize()
-
-    # Printing solution and objective value
-    def printSolution():
-        if model.status == GRB.OPTIMAL:
-            print('\n objective: %g\n' % model.ObjVal)
-            print("Selected following matching:")
-            # for j in hospitals:
-            #     for i in cities:
-            #         # add constraints
-            #         if (j,i) in id_pairs:
-            #             for k in types_hospitals:
-            #                 if x[j,i].x == 1 and y[j,k].x == 1:
-            #                     print((j,i,k+1,euclidean_distance(df_hospitals.loc[j]['x_coord'], df_hospitals.loc[j]['y_coord'],
-            #                                     df_cities.loc[i]['x_coord'], df_cities.loc[i]['y_coord'])))
-        else:
-            print("No solution!")
-
-    printSolution()
+    # model.update()
+    # # model.write('Timetables.lp')
+    # model.optimize()
+    #
+    # # Printing solution and objective value
+    # def printSolution():
+    #     if model.status == GRB.OPTIMAL:
+    #         print('\n objective: %g\n' % model.ObjVal)
+    #         print("Selected following matching:")
+    #         for j in hospitals:
+    #             for i in cities:
+    #                 # add constraints
+    #                 if (j,i) in id_pairs:
+    #                     for k in types_hospitals:
+    #                         if x[j,i].x == 1 and y[j,k].x == 1:
+    #                             print((j,i,k+1,euclidean_distance(df_hospitals.loc[j]['x_coord'], df_hospitals.loc[j]['y_coord'],
+    #                                             df_cities.loc[i]['x_coord'], df_cities.loc[i]['y_coord'])))
+    #     else:
+    #         print("No solution!")
+    #
+    # printSolution()
 
     return model
 
-# solve('data1.csv')
-data_load('comp02.ctt')
+solve('comp05.ctt')
+# data_load('comp02.ctt')
