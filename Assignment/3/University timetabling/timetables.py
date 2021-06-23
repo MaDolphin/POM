@@ -55,6 +55,13 @@ def data_load(fileName):
 
     return df_courses, df_rooms, dict_curricula, df_unavailability_constraints, days, periods
 
+def set2pairSet(init_set):
+    result_list = []
+    temp_list = list(init_set)
+    for i in range(len(temp_list) - 1):
+        for j in temp_list[i + 1:]:
+            result_list.append({temp_list[i], j})
+    return result_list
 
 def solve(full_path_instance):
     df_courses, df_rooms, dict_curricula, df_unavailability_constraints, days, periods = data_load(full_path_instance)
@@ -84,33 +91,33 @@ def solve(full_path_instance):
 
     # for course in which curricula
     courses_curriculas_pair = {}
-    set_temp = set()
+    temp_set = set()
     for course in courses:
         for curricula in curriculas:
             if course in dict_curricula[curricula]['members']:
-                set_temp.add(curricula)
-        courses_curriculas_pair[course] = set_temp.copy()
-        set_temp.clear()
+                temp_set.add(curricula)
+        courses_curriculas_pair[course] = temp_set.copy()
+        temp_set.clear()
 
     # course can be take place in which rooms K_r
     courses_rooms_pairs = {}
-    set_temp.clear()
+    temp_set.clear()
     for k in courses:
         for r in rooms:
             if df_courses.loc[k]['countOfStudents'] <= df_rooms.loc[r]['capacity']:
-                set_temp.add(r)
-        courses_rooms_pairs[k] = set_temp.copy()
-        set_temp.clear()
+                temp_set.add(r)
+        courses_rooms_pairs[k] = temp_set.copy()
+        temp_set.clear()
 
     # for rooms which course can be take place in R_r
     rooms_courses_pairs = {}
-    set_temp.clear()
+    temp_set.clear()
     for r in rooms:
         for k in courses:
             if df_courses.loc[k]['countOfStudents'] <= df_rooms.loc[r]['capacity']:
-                set_temp.add(k)
-        rooms_courses_pairs[r] = set_temp.copy()
-        set_temp.clear()
+                temp_set.add(k)
+        rooms_courses_pairs[r] = temp_set.copy()
+        temp_set.clear()
 
     ############################################################################################
 
@@ -121,97 +128,210 @@ def solve(full_path_instance):
     x = {}
     for k in courses:
         for (i,j) in time_slots:
-            x[k,i,j] = model.addVar(name="x_%s_(%s,%s)" % (k, i, j), vtype=GRB.BINARY)
+            x[k,i,j] = model.addVar(
+                name="x_%s_(%s,%s)" % (k, i, j),
+                vtype=GRB.BINARY)
 
-    # soft constraints
-    penalty_assistant = model.addVar(name="penalty_assistant", vtype=GRB.INTEGER)
-
-    # soft constraints
-    # whether k is penalized, 1 is penalized, 0 is not penalized
-    penalty_students = {}
+    # whether course k takes place on day i
+    y = {}
     for k in courses:
-        penalty_students[k] = model.addVar(name="penalty_students_%s" % (k), vtype=GRB.BINARY)
+        for i in range(days):
+            y[k,i] = model.addVar(
+                name="y_%s_(%s,_)" % (k, i),
+                vtype=GRB.BINARY)
 
     # soft constraints
-    penalty_days = model.addVar(name="penalty_days", vtype=GRB.INTEGER)
+    penalty_assistant = {}
+    for k_1 in courses:
+        for k_2 in courses:
+            for (i,j) in time_slots:
+                if k_1 != k_2:
+                    penalty_assistant[k_1,k_2,i,j] = model.addVar(
+                        name="penalty_assistant_%s_%s_(%s,%s)" % (k_1, k_2, i, j),
+                        vtype=GRB.BINARY)
 
     # soft constraints
-    penalty_teachers = model.addVar(name="penalty_teachers", vtype=GRB.INTEGER)
+    penalty_students = {}
+    for k_1 in courses:
+        for k_2 in courses:
+            for (i,j) in time_slots:
+                if k_1 != k_2:
+                    penalty_students[k_1,k_2,i,j] = model.addVar(
+                        name="penalty_students_%s_%s_(%s,%s)" % (k_1, k_2, i, j),
+                        vtype=GRB.BINARY)
+
+    # soft constraints
+    penalty_days = {}
+    for k in courses:
+        penalty_days[k] = model.addVar(
+            name="penalty_days_%s" % (k),
+            vtype=GRB.INTEGER)
+
+    # soft constraints
+    penalty_teachers = {}
+    for index, row in df_unavailability_constraints.iterrows():
+        k = index
+        i = row[0]
+        j = row[1]
+        penalty_teachers[k,i,j] = model.addVar(
+            name="penalty_teachers_%s_(%s,%s)" % (k, i, j),
+            vtype=GRB.BINARY)
 
     # penalty rate
     c_assistant = 1.0
     c_students = 0.1
     c_days = 0.1
-    c_teachers = 10
+    c_teachers = 10.0
 
     ############################################################################################
 
-    # For every course, a given number <l_k> of lectures have to be scheduled
+    # Constr_1: For every course, a given number <l_k> of lectures have to be scheduled
     for k in courses:
         model.addConstr(quicksum(x[k,i,j] for (i,j) in time_slots) ==
                         df_courses.loc[k]['countOfLectures'])
 
-    # The lectures of a given course have to take place on at least <d_k> different days
-    # *** using 'penalty_days' for course taking place less than <d_k> different days ***
-    for k in courses:
-        model.addConstr(quicksum(x[k,i,j] for i in range(days)) >=
-                        df_courses.loc[k]['minWorkingDays'] - penalty_days)
 
-    # Courses taught by the same teacher can not take place in the same time-slot
-    # *** using 'penalty_assistant' for the same teacher taking place in the same time-slot ***
+
+    # Constr_2: The lectures of a given course have to take place on at least <d_k> different days
+    # a). with penalty model:
+    # *** using 'penalty_days[k]' for course taking place less than <d_k> different days ***
+    for k in courses:
+        model.addConstr(quicksum(y[k,i] for i in range(days)) >=
+                        df_courses.loc[k]['minWorkingDays'] - penalty_days[k])
+
+    # b). no penalty model:
+    # for k in courses:
+    #     model.addConstr(quicksum(y[k,i] for i in range(days)) >=
+    #                     df_courses.loc[k]['minWorkingDays'])
+
+    # Constr_2.1: Linking between x[k,i,j] and y[k,i]
+    for k in courses:
+        for i in range(days):
+            model.addConstr(y[k,i] <= quicksum(x[k,i,j] for j in range(periods)))
+
+
+
+    # Constr_3: Courses taught by the same teacher can not take place in the same time-slot
+    # a). with penalty model:
+    # *** using 'penalty_assistant[k_1,k_2,i,j]' for the same teacher taking place in the same time-slot ***
     for teacher in teachers:
         for (i,j) in time_slots:
-            model.addConstr(quicksum(x[k,i,j] for k in teacher_course_pairs[teacher]) <= 1 + penalty_assistant)
+            pairs = teacher_course_pairs[teacher]
+            if len(pairs) == 1:
+                k = pairs.pop()
+                # model.addConstr(x[k, i, j] == 1)
+            else:
+                for k_1, k_2 in set2pairSet(pairs):
+                    model.addConstr((x[k_1,i,j] + x[k_2,i,j]) <= 1 + penalty_assistant[k_1,k_2,i,j])
 
-    # Courses that are part of the same curriculum can not take place in the same time-slot
-    # *** using 'penalty_students[k]' for courses k of the same curriculum taking place in the same time-slot ***
+    # b). no penalty model:
+    # for teacher in teachers:
+    #     for (i,j) in time_slots:
+    #         model.addConstr(quicksum(x[k, i, j] for k in teacher_course_pairs[teacher]) <= 1)
+
+
+
+    # Constr_4: Courses that are part of the same curriculum can not take place in the same time-slot
+    # a). with penalty model:
+    # *** using 'penalty_students[k_1,k_2,i,j]' for courses k of the same curriculum taking place in the same time-slot ***
     for curricula in curriculas:
         for (i,j) in time_slots:
-            model.addConstr(quicksum(x[k,i,j] for k in dict_curricula[curricula]['members']) <=
-                            1 + quicksum(penalty_students[k] for k in dict_curricula[curricula]['members']))
+            pairs = dict_curricula[curricula]['members']
+            if len(pairs) == 1:
+                k = pairs.pop()
+                # model.addConstr(x[k, i, j] == 1)
+            else:
+                for k_1, k_2 in set2pairSet(pairs):
+                    model.addConstr((x[k_1,i,j] + x[k_2,i,j]) <= 1 + penalty_students[k_1,k_2,i,j])
 
-    # For a variety of reasons, some unavailability constraints are given,
+    # b). no penalty model:
+    # for curricula in curriculas:
+    #     for (i,j) in time_slots:
+    #         model.addConstr(quicksum(x[k,i,j] for k in dict_curricula[curricula]['members']) <= 1)
+
+
+
+    # Constr_5: For a variety of reasons, some unavailability constraints are given,
     # such that courses <k> can not take place in some time-slots (i,j)
-    # *** using 'penalty_teachers' for assignment the course on time-slot that teacher don't like ***
+    # a). with penalty model:
+    # *** using 'penalty_teachers[k,i,j]' for assignment the course on time-slot that teacher don't like ***
     for index, row in df_unavailability_constraints.iterrows():
         k = index
         i = row[0]
         j = row[1]
-        model.addConstr(x[k,i,j] <= 0 + penalty_teachers)
+        model.addConstr(x[k,i,j] <= 0 + penalty_teachers[k,i,j])
+
+    # b). no penalty model:
+    # for index, row in df_unavailability_constraints.iterrows():
+    #     k = index
+    #     i = row[0]
+    #     j = row[1]
+    #     model.addConstr(x[k,i,j] == 0)
+
+
 
     ############################################################################################
 
-
     model.setObjective(
-        0.0 + c_assistant * penalty_assistant +
-            c_students * quicksum(penalty_students[k] for k in courses) +
-            c_days * penalty_days +
-            c_teachers * penalty_teachers,
+        0.0 + c_assistant * quicksum(penalty_assistant[k_1,k_2,i,j]
+                                     for k_1 in courses
+                                     for k_2 in courses
+                                     for (i,j) in time_slots if k_1 != k_2) +
+            c_students * quicksum(penalty_students[k_1,k_2,i,j]
+                                  for k_1 in courses
+                                  for k_2 in courses
+                                  for (i,j) in time_slots if k_1 != k_2) +
+            c_days * quicksum(penalty_days[k]
+                              for k in courses) +
+            c_teachers * quicksum(penalty_teachers[index,row[0],row[1]]
+                                  for index, row in df_unavailability_constraints.iterrows()),
         GRB.MINIMIZE
     )
 
     model.update()
     model.write('Timetables.lp')
     model.optimize()
-    #
-    # # Printing solution and objective value
-    # def printSolution():
-    #     if model.status == GRB.OPTIMAL:
-    #         print('\n objective: %g\n' % model.ObjVal)
-    #         print("Selected following matching:")
-    #         for j in hospitals:
-    #             for i in cities:
-    #                 # add constraints
-    #                 if (j,i) in id_pairs:
-    #                     for k in types_hospitals:
-    #                         if x[j,i].x == 1 and y[j,k].x == 1:
-    #                             print((j,i,k+1,euclidean_distance(df_hospitals.loc[j]['x_coord'], df_hospitals.loc[j]['y_coord'],
-    #                                             df_cities.loc[i]['x_coord'], df_cities.loc[i]['y_coord'])))
-    #     else:
-    #         print("No solution!")
-    #
-    # printSolution()
+
+    # Printing solution and objective value
+    def printSolution():
+        if model.status == GRB.OPTIMAL:
+            print('\n objective: %g\n' % model.ObjVal)
+            print("Selected following matching:")
+            for k in courses:
+                for (i,j) in time_slots:
+                    if x[k,i,j].x == 1:
+                        print("x_%s_(%s,%s)" % (k, i, j))
+
+            for k in courses:
+                if penalty_days[k].x >= 1:
+                    print("penalty_days_%s" % (k))
+
+            for k_1 in courses:
+                for k_2 in courses:
+                    for (i, j) in time_slots:
+                        if k_1 != k_2:
+                            if penalty_assistant[k_1,k_2,i,j].x == 1:
+                                print("penalty_assistant_%s_%s_(%s,%s)" % (k_1, k_2, i, j))
+
+            for k_1 in courses:
+                for k_2 in courses:
+                    for (i, j) in time_slots:
+                        if k_1 != k_2:
+                            if penalty_students[k_1,k_2,i,j].x == 1:
+                                print("penalty_students_%s_%s_(%s,%s)" % (k_1, k_2, i, j))
+
+            for index, row in df_unavailability_constraints.iterrows():
+                k = index
+                i = row[0]
+                j = row[1]
+                if penalty_teachers[k, i, j].x == 1:
+                    print("penalty_teachers_%s_(%s,%s)" % (k, i, j))
+
+        else:
+            print("No solution!")
+
+    printSolution()
 
     return model
 
-solve('comp02.ctt')
+solve('comp05.ctt')

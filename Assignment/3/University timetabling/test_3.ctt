@@ -1,0 +1,30 @@
+Name: ############### Penalty 2
+Courses: 3
+Rooms: 6
+Days: 1
+Periods_per_day: 2
+Curricula: 2
+Constraints: 2
+
+COURSES:
+c0001 t001 1 1 130
+c0002 t001 2 1 75
+c0003 t002 1 1 75
+
+ROOMS:
+B	200
+C	100
+E	9
+F	30
+G	20
+S	30
+
+CURRICULA:
+q000  1 c0001 c0002 c0003
+q001  1 c0002 c0001
+
+UNAVAILABILITY_CONSTRAINTS:
+c0001 0 1
+c0003 0 1
+
+END.
