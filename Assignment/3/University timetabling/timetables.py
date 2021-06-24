@@ -223,7 +223,7 @@ def solve(full_path_instance):
             pairs = teacher_course_pairs[teacher]
             if len(pairs) == 1:
                 k = pairs.pop()
-                # model.addConstr(x[k, i, j] == 1)
+                model.addConstr(x[k, i, j] <= 1)
             else:
                 for k_1, k_2 in set2pairSet(pairs):
                     model.addConstr((x[k_1,i,j] + x[k_2,i,j]) <= 1 + penalty_assistant[k_1,k_2,i,j])
@@ -243,7 +243,7 @@ def solve(full_path_instance):
             pairs = dict_curricula[curricula]['members']
             if len(pairs) == 1:
                 k = pairs.pop()
-                # model.addConstr(x[k, i, j] == 1)
+                model.addConstr(x[k, i, j] <= 1)
             else:
                 for k_1, k_2 in set2pairSet(pairs):
                     model.addConstr((x[k_1,i,j] + x[k_2,i,j]) <= 1 + penalty_students[k_1,k_2,i,j])
@@ -291,6 +291,8 @@ def solve(full_path_instance):
                                   for index, row in df_unavailability_constraints.iterrows()),
         GRB.MINIMIZE
     )
+
+    # model.setObjective(0.0, GRB.MINIMIZE)
 
     model.update()
     model.write('Timetables.lp')
@@ -346,21 +348,18 @@ def solve(full_path_instance):
                 # plt.show()
                 # nx.draw(G, with_labels=True)
 
-                print(flow[0])
+                # print(flow[0])
 
                 if len(courses_time) > flow[0]:
                     model.cbLazy(quicksum(x[k,i,j] for (k,_,_) in courses_time) <= flow[0])
                     SEC_added = SEC_added + 1
-                    break
-                else:
-                    continue
 
     # indicate that some constraints are "lazily" added to the model
     model.params.LazyConstraints = 1
-
     model.optimize(separateRoom)
-
     print("Added", SEC_added, "SECs.")
+
+    # model.optimize()
 
     # Printing solution and objective value
     def printSolution():
@@ -404,4 +403,4 @@ def solve(full_path_instance):
 
     return model
 
-solve('comp02.ctt')
+solve('comp01.ctt')
