@@ -403,4 +403,4 @@ def solve(full_path_instance):
 
     return model
 
-solve('comp01.ctt')
+solve('test_0.ctt')

@@ -21,4 +21,14 @@ test = [{(a_1,b_1),(a_2,b_2)},
 # for (a_1,b_1),(a_2,b_2) in test:
 #     print((a_1,b_1),(a_2,b_2))
 
-print(a.pop())
+def set2pairSet(init_set):
+    result_list = []
+    temp_list = sorted(list(init_set))
+    for i in range(len(temp_list)):
+        # for j in temp_list[i + 1:]:
+        for j in range(i+1, len(temp_list)):
+            result_list.append((temp_list[i], temp_list[j]))
+    return result_list
+
+print(set2pairSet(a))
+# print(a.pop())
