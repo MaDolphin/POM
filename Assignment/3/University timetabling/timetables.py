@@ -63,7 +63,11 @@ def set2pairSet(init_set):
             result_list.append({temp_list[i], j})
     return result_list
 
+SEC_added = 0
+
 def solve(full_path_instance):
+    global SEC_added
+
     df_courses, df_rooms, dict_curricula, df_unavailability_constraints, days, periods = data_load(full_path_instance)
 
     # courses K
@@ -290,7 +294,73 @@ def solve(full_path_instance):
 
     model.update()
     model.write('Timetables.lp')
-    model.optimize()
+
+    ############################################################################################
+
+
+    # define a so-called "callback" which in each node of the B&C tree (not only
+    # at the root node) adds violated subtour elimination constraints
+    def separateRoom(model, where):
+        global SEC_added
+        if where == GRB.Callback.MIPSOL:
+            rel = model.cbGetSolution(x)
+
+            for (i,j) in time_slots:
+
+                courses_time = []
+                for k in courses:
+                    if rel[k, i, j] == 1:
+                        courses_time.append((k,i,j))
+
+                # edge_s_k = []
+                # for item in courses_time:
+                #     edge_s_k.append(('start',item[0]))
+
+                edge_rooms_t = []
+                for room in rooms:
+                    edge_rooms_t.append((room,'terminal'))
+
+                edge_k_rooms = []
+                for k in courses:
+                    for (i,j) in time_slots:
+                        for room in courses_rooms_pairs[k]:
+                            edge_k_rooms.append(((k,i,j),room))
+
+                # check for violate Room (max flow algorithm)
+                G = nx.DiGraph()
+
+                G.add_node('start')
+                G.add_node('terminal')
+                G.add_nodes_from(courses)
+                G.add_nodes_from(rooms)
+
+                for k in courses:
+                    G.add_edge('start', k, capacity=rel[k, i, j])
+
+                G.add_edges_from(edge_rooms_t, capacity=1)
+                G.add_edges_from(edge_k_rooms, capacity=1)
+
+                flow = nx.maximum_flow(G, 'start', 'terminal')
+
+                # import matplotlib.pyplot as plt
+                # plt.show()
+                # nx.draw(G, with_labels=True)
+
+                print(flow[0])
+
+                if len(courses_time) > flow[0]:
+                    model.cbLazy(quicksum(x[k,i,j] for (k,_,_) in courses_time) <= flow[0])
+                    SEC_added = SEC_added + 1
+                    break
+                else:
+                    continue
+
+    # indicate that some constraints are "lazily" added to the model
+    model.params.LazyConstraints = 1
+
+    model.optimize(separateRoom)
+
+    print("Added", SEC_added, "SECs.")
 
     # Printing solution and objective value
     def printSolution():
@@ -330,8 +400,8 @@ def solve(full_path_instance):
         else:
             print("No solution!")
 
-    printSolution()
+    # printSolution()
 
     return model
 
-solve('comp05.ctt')
+solve('comp02.ctt')
