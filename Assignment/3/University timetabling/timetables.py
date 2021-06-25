@@ -1,8 +1,16 @@
 from gurobipy import *
 import networkx as nx
 import math
+import logging
 import re
 import pandas as pd
+
+#logging file
+logging.basicConfig(level = logging.INFO,format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s', filename='log', filemode='w')
+
+logger = logging.getLogger(__name__)
+
+logger.info('start')
 
 def data_load(fileName):
     listSet = []
@@ -55,7 +63,7 @@ def data_load(fileName):
 
     return df_courses, df_rooms, dict_curricula, df_unavailability_constraints, days, periods
 
-def set2pairSet(init_list):
+def list2pairList(init_list):
     result_list = []
     temp_list = sorted(init_list)
     for i in range(len(temp_list)):
@@ -83,19 +91,26 @@ def solve(full_path_instance):
     # curriculas Curriculas
     curriculas = dict_curricula.keys()
 
+    logger.info(f'courses: {courses}')
+    logger.info(f'df_rooms: {rooms}')
+    logger.info(f'curricula: {curriculas}')
+
     # time_slots T
     time_slots = []
     for i in range(days):
         for j in range(periods):
             time_slots.append((i,j))
 
+    logger.info(f'time slots: {time_slots}')
     # teachers Teachers
     teachers = df_courses['teacher'].unique()
+    logger.info(f'teachers: {teachers}')
 
     # teacher teachs which courses
     teacher_course_pairs = {}
     for teacher in teachers:
         teacher_course_pairs[teacher] = df_courses[df_courses['teacher'] == teacher].index.to_list()
+    logger.info(f'teacher teachs courses: {teacher_course_pairs}')
 
     # for course in which curricula
     courses_curriculas_pair = {}
@@ -109,6 +124,8 @@ def solve(full_path_instance):
                     courses_curriculas_pair[course].append(curricula)
         # courses_curriculas_pair[course] = temp_list.copy()
         # temp_list.clear()
+    logger.info(f'courses : [curricula]: {courses_curriculas_pair}')
+
 
     # course can be take place in which rooms K_r
     courses_rooms_pairs = {}
@@ -117,24 +134,28 @@ def solve(full_path_instance):
         for r in rooms:
             if df_courses.loc[k]['countOfStudents'] <= df_rooms.loc[r]['capacity']:
                 temp_list.append(r)
+        # if temp_list:
         courses_rooms_pairs[k] = temp_list.copy()
         temp_list.clear()
-
+    logger.info(f'courses room pairs: {courses_rooms_pairs}')
     # for rooms which course can be take place in R_r
-    rooms_courses_pairs = {}
-    temp_list.clear()
-    for r in rooms:
-        for k in courses:
-            if df_courses.loc[k]['countOfStudents'] <= df_rooms.loc[r]['capacity']:
-                temp_list.append(k)
-        rooms_courses_pairs[r] = temp_list.copy()
-        temp_list.clear()
+    # rooms_courses_pairs = {}
+    # temp_list.clear()
+    # for r in rooms:
+    #     for k in courses:
+    #         if df_courses.loc[k]['countOfStudents'] <= df_rooms.loc[r]['capacity']:
+    #             temp_list.append(k)
+    #     rooms_courses_pairs[r] = temp_list.copy()
+    #     temp_list.clear()
 
     courses_courses_pairs = []
     for k_1 in range(len(courses)):
         for k_2 in range(k_1+1, len(courses)):
             courses_courses_pairs.append((courses[k_1],courses[k_2]))
 
+    assert len(courses_courses_pairs) == len(courses)*(len(courses)-1)/2
+
+    logger.info(f'courses courses pairs {courses_courses_pairs}')
 
     ############################################################################################
 
@@ -216,9 +237,19 @@ def solve(full_path_instance):
     #                     df_courses.loc[k]['minWorkingDays'])
 
     # Constr_2.1: Linking between x[k,i,j] and y[k,i]
+    # for k in courses:
+    #     for i in range(days):
+    #         model.addConstr(quicksum(x[k,i,j] for j in range(periods)) == quicksum(y[k,i]*x[k,i,j] for j in range(periods)))
+
     for k in courses:
         for i in range(days):
-            model.addConstr(quicksum(x[k,i,j] for j in range(periods)) <= quicksum(y[k,i]*x[k,i,j] for j in range(periods)))
+            for j in range(periods):
+                model.addConstr(x[k,i,j] <= y[k,i])
+
+    for k in courses:
+        for i in range(days):
+            model.addConstr(y[k,i] <= quicksum(x[k,i,j] for j in range(periods)))
+
 
 
     # Constr_3: Courses taught by the same teacher can not take place in the same time-slot
@@ -228,7 +259,7 @@ def solve(full_path_instance):
         for (i,j) in time_slots:
             t_courses = teacher_course_pairs[teacher]
             if len(t_courses) > 1:
-                for k_1, k_2 in set2pairSet(t_courses):
+                for k_1, k_2 in list2pairList(t_courses):
                     if (k_1,k_2) in courses_courses_pairs:
                         model.addConstr((x[k_1,i,j] + x[k_2,i,j]) <= 1 + penalty_assistant[k_1,k_2,i,j])
 
@@ -246,7 +277,7 @@ def solve(full_path_instance):
         for (i,j) in time_slots:
             c_courses = dict_curricula[curricula]['members']
             if len(c_courses) > 1:
-                for k_1, k_2 in set2pairSet(c_courses):
+                for k_1, k_2 in list2pairList(c_courses):
                     if (k_1, k_2) in courses_courses_pairs:
                         model.addConstr((x[k_1,i,j] + x[k_2,i,j]) <= 1 + penalty_students[k_1,k_2,i,j])
 
@@ -279,7 +310,7 @@ def solve(full_path_instance):
     ############################################################################################
 
     model.setObjective(
-        0.0 + c_assistant * quicksum(penalty_assistant[k_1,k_2,i,j]
+            0.0 + c_assistant * quicksum(penalty_assistant[k_1,k_2,i,j]
                                      for k_1, k_2 in courses_courses_pairs
                                      for (i,j) in time_slots) +
             c_students * quicksum(penalty_students[k_1,k_2,i,j]
@@ -291,8 +322,6 @@ def solve(full_path_instance):
                                   for index, row in df_unavailability_constraints.iterrows()),
         GRB.MINIMIZE
     )
-
-    # model.setObjective(0.0, GRB.MINIMIZE)
 
     model.update()
     model.write('Timetables.lp')
@@ -333,20 +362,25 @@ def solve(full_path_instance):
         else:
             print("No solution!")
 
+
+
+
     # define a so-called "callback" which in each node of the B&C tree (not only
     # at the root node) adds violated subtour elimination constraints
     def separateRoom(model, where):
         global SEC_added
         if where == GRB.Callback.MIPSOL:
             rel = model.cbGetSolution(x)
+            # logger.info('***********')
+            # logger.info(rel)
+            # logger.info('***********')
 
-            a, b = 0, 0
-            for (i, j) in time_slots:
+            def createGraph(i,j):
 
-                courses_time = []
+                courses_with_time = []
                 for k in courses:
-                    if rel[k, i, j] == 1:
-                        courses_time.append((k, i, j))
+                    if round(rel[k, i, j]) == 1:
+                        courses_with_time.append((k,i,j))
 
                 edge_rooms_t = []
                 for room in rooms:
@@ -354,8 +388,10 @@ def solve(full_path_instance):
 
                 edge_k_rooms = []
                 for k in courses:
+                    # if k in courses_courses_pairs:
                     for room in courses_rooms_pairs[k]:
-                        edge_k_rooms.append((k, room))
+                        if room != '':
+                            edge_k_rooms.append((k, room))
 
                 # check for violate Room (max flow algorithm)
                 G = nx.DiGraph()
@@ -366,22 +402,31 @@ def solve(full_path_instance):
                 G.add_nodes_from(rooms)
 
                 for k in courses:
-                    G.add_edge('start', k, capacity=rel[k, i, j])
+                    G.add_edge('start', k, capacity=round(rel[k, i, j]))
 
                 G.add_edges_from(edge_rooms_t, capacity=1)
                 G.add_edges_from(edge_k_rooms, capacity=1)
 
+                # print(G.nodes())
+
                 flow = nx.maximum_flow(G, 'start', 'terminal')
 
-                if len(courses_time) > flow[0]:
-                    model.addConstr(quicksum(x[k, i, j] for (k, _, _) in courses_time) <= flow[0])
+                return courses_with_time, flow[0]
+
+            a, b = 0, 0
+            for (i, j) in time_slots:
+
+                courses_with_time, flow_max = createGraph(i,j)
+
+                if len(courses_with_time) > flow_max:
+                    model.cbLazy(quicksum(x[k, i, j] for (k, _, _) in courses_with_time) <= flow_max)
                     SEC_added = SEC_added + 1
-                    courses_time.clear()
+                    courses_with_time.clear()
                     a += 1
                     # print("True")
-                    # break
+                    break
                 else:
-                    courses_time.clear()
+                    courses_with_time.clear()
                     # print("False")
                     b += 1
                     continue
@@ -398,66 +443,7 @@ def solve(full_path_instance):
 
     # model.optimize()
 
-    # No-Callback-function
-    # while SEC_violated == True:
-    #
-    #     model.optimize()
-    #
-    #     Flag_add_constr = False
-    #
-    #     a ,b = 0 , 0
-    #     for (i, j) in time_slots:
-    #
-    #         courses_time = []
-    #         for k in courses:
-    #             if x[k, i, j].x == 1:
-    #                 courses_time.append((k, i, j))
-    #
-    #         edge_rooms_t = []
-    #         for room in rooms:
-    #             edge_rooms_t.append((room, 'terminal'))
-    #
-    #         edge_k_rooms = []
-    #         for k in courses:
-    #             for room in courses_rooms_pairs[k]:
-    #                 edge_k_rooms.append((k, room))
-    #
-    #         # check for violate Room (max flow algorithm)
-    #         G = nx.DiGraph()
-    #
-    #         G.add_node('start')
-    #         G.add_node('terminal')
-    #         G.add_nodes_from(courses)
-    #         G.add_nodes_from(rooms)
-    #
-    #         for k in courses:
-    #             G.add_edge('start', k, capacity=x[k, i, j].x)
-    #
-    #         G.add_edges_from(edge_rooms_t, capacity=1)
-    #         G.add_edges_from(edge_k_rooms, capacity=1)
-    #
-    #         flow = nx.maximum_flow(G, 'start', 'terminal')
-    #
-    #         if len(courses_time) > flow[0]:
-    #             model.addConstr(quicksum(x[k, i, j] for (k, _, _) in courses_time) <= flow[0])
-    #             SEC_added = SEC_added + 1
-    #             Flag_add_constr = True
-    #             courses_time.clear()
-    #             a += 1
-    #             # print("True")
-    #             break
-    #         else:
-    #             courses_time.clear()
-    #             # print("False")
-    #             b += 1
-    #             continue
-    #
-    #     print('violated:', a, 'correct:', b)
-    #     if Flag_add_constr == False:
-    #         SEC_violated = False
-
-    # printSolution()
 
     return model
 
-solve('comp05.ctt')
+solve('comp01.ctt')

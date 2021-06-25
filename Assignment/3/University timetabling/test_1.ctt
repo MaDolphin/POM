@@ -1,7 +1,7 @@
 Name: ############### Penalty 3 and 4
 Courses: 2
 Rooms: 6
-Days: 1
+Days: 2
 Periods_per_day: 2
 Curricula: 2
 Constraints: 1
@@ -9,10 +9,12 @@ Constraints: 1
 COURSES:
 c0001 t001 1 1 130
 c0002 t001 1 1 75
+ssss  teacher 3 0 500
 
 ROOMS:
 B	200
 C	100
+D   210
 
 CURRICULA:
 q000  1 c0001
