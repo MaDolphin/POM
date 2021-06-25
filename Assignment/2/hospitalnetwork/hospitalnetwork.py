@@ -175,4 +175,4 @@ def solve(full_path_instance):
 
     return model
 
-solve('data1.csv')
+solve('data2.csv')
