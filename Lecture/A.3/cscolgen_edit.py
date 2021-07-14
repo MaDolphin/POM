@@ -49,14 +49,14 @@ def visu_patterns(patterns, lambdas, L, l, n):
                 height[p] = l[i] * patterns[p][i]
                 top[p] = top[p] + height[p]
         # plot current order i
-        plt.bar(list(range(len(patterns))), height, bottom=bottom, color=inferno(i/n))    
+        # plt.bar(list(range(len(patterns))), height, bottom=bottom, color=inferno(i/n))    
         # old top becomes new bottom, for "next" order i+1
         bottom=top[:]
         
     # assumes that solve method is called from data file :(
-    plt.savefig("cs-%s.png" % (sys.argv[0].split('.')[0]), dpi=300, transparent=True)
+    # plt.savefig("cs-%s.png" % (sys.argv[0].split('.')[0]), dpi=300, transparent=True)
 
-    plt.show()
+    # plt.show()
 
 ###############################################################################
 
@@ -109,7 +109,7 @@ def solve(m, L, d, l):
         
     # gurobi should be silent
     rmp.params.outputFlag = 0
-    rmp.write("RMP.lp")
+    # rmp.write("RMP.lp")
 
     
     
@@ -126,63 +126,72 @@ def solve(m, L, d, l):
 
     # gurobi should be silent
     pp.params.outputFlag = 0
-    pp.write("PP.lp")    
+    # pp.write("PP.lp")    
 
 
 
     # column generation loop
     optimal = False
-    iteration = 0
+    # iteration = 0
     
     while not optimal:
-        iteration += 1
-        vprint(f"\niteration {iteration}")
+        # iteration += 1
+        # vprint(f"\niteration {iteration}")
         
         # re-optimize the RMP
         rmp.optimize()
-        vprint(f"curremt RMP objective value is {rmp.objval:.6f}")
+        # vprint(f"curremt RMP objective value is {rmp.objval:.6f}")
         
         # obtain dual optimal solution
         pi = {}
         for i in range(n):
             pi[i] = demand[i].getAttr(GRB.Attr.Pi) # demand[i].pi works as well
         
+        # print(dir(demand[0]))
+        # print('*****************************************')
+        # print(demand[0].Pi)
+        # # d = [demand[i]. for i in range(len(demand))]
+        # # print(d)
+        # print('##########################################################')
+        # print('pi: ',pi)
+        
         # debugging: output dual variable values
-        for i in range(n):
-            vprint(f"pi[{i}] is {pi[i]:.4f}")
+        # for i in range(n):
+        #     vprint(f"pi[{i}] is {pi[i]:.4f}")
             
         # modify pricing problem's objective
         pp.setObjective(1 + quicksum(-pi[i] * x[i] for i in range(n)))
+
+        # print('ModelSense',pp.ModelSense)
         
         # solve pricing problem
         pp.optimize()
         
-        vprint(f"pricing: smallest reduced cost is {pp.objVal:.6f}")
+        # vprint(f"pricing: smallest reduced cost is {pp.objVal:.6f}")
         if pp.objVal < -.00001:
-
+            
             # create a new pattern 
             new_pattern = {}
             for i in range(n):
-                name = 'x_' + str(i)
-                x_i = pp.getVarByName(name)
-                assert x_i.x == x[i].x
-                if x_i.x > 0.1: # sparsely store the pattern, only positive entries
-                    new_pattern[i] = x_i.x
+                # name = 'x_' + str(i)
+                # x_i = pp.getVarByName(name)
+                if x[i].x > 0.1: # sparsely store the pattern, only positive entries
+                    new_pattern[i] = x[i].x
             patterns.append(new_pattern)
             
             # create a new variable for the new pattern, and add it to the RMP 
             # with column coefficients corresponding to the new pattern
             #
             p = len(patterns)-1
-            vprint(f"created pattern {p}: {patterns[p]}")
+            # vprint(f"created pattern {p}: {patterns[p]}")
             lambdas[p] = rmp.addVar(obj=1.0, name=f'lambda_{p}',
                                     column = Column(list(int(x[i].x) for i in range(n)), list(demand[i] for i in range(n))))
             
-            #visu_patterns(patterns, lambdas, L, l, n)
+            visu_patterns(patterns, lambdas, L, l, n)
 
             
         else: # no negative reduced cost column found   
-            vprint("pricing: no negative reduced cost column found")
+            # vprint("pricing: no negative reduced cost column found")
             optimal = True
             
         #pp.write(f"PP-{iteration:04d}.lp")
@@ -191,10 +200,10 @@ def solve(m, L, d, l):
 
 
     # output optimal solution objective function value of LP relaxation
-    vprint(f"\noptimal objective at the root node: {rmp.objval}")
-    for p in range(len(patterns)):
-        if lambdas[p].x > 0.001:
-            vprint(f"lambda[{p}] = {lambdas[p].x:.4f}")    
+    # vprint(f"\noptimal objective at the root node: {rmp.objval}")
+    # for p in range(len(patterns)):
+    #     if lambdas[p].x > 0.001:
+    #         vprint(f"lambda[{p}] = {lambdas[p].x:.4f}")    
  
     # change all RMP variables to integers
     for j in rmp.getVars():
@@ -205,27 +214,27 @@ def solve(m, L, d, l):
     rmp.optimize()
     
     # output final (heuristic) integer solution and objective function
-    print(f"\nobjective (potentially suboptimal) after B&B: {rmp.objval}")
-    for p in range(len(patterns)):
-        if lambdas[p].x > 0.001:
-            print(f"lambda[{p}] = {lambdas[p].x:.4f}")    
+    # print(f"\nobjective (potentially suboptimal) after B&B: {rmp.objval}")
+    # for p in range(len(patterns)):
+    #     if lambdas[p].x > 0.001:
+    #         print(f"lambda[{p}] = {lambdas[p].x:.4f}")    
 
  
 
 
     # solution checker (paranoia!)
-    vprint("\n*** verfiying solution")
-    vprint(f"data: L={L}, l: {l}, d: {d}")    
+    # vprint("\n*** verfiying solution")
+    # vprint(f"data: L={L}, l: {l}, d: {d}")    
     
-    vprint(f"number of rolls used: {sum(lambdas[p].x for p in range(len(patterns)))}")
-    for i in range(n):    
-        vprint(f"order {i} is cut {sum(patterns[p][i]*lambdas[p].x for p in range(len(patterns)) if i in patterns[p])} times; demand is {d[i]}")
-        for p in range(len(patterns)):
-            if lambdas[p].x > 0.001 and i in patterns[p]:
-                vprint(f"- pattern {p}={patterns[p]} used {lambdas[p].x} times, contributes {patterns[p][i] * lambdas[p].x} items")
+    # vprint(f"number of rolls used: {sum(lambdas[p].x for p in range(len(patterns)))}")
+    # for i in range(n):    
+    #     vprint(f"order {i} is cut {sum(patterns[p][i]*lambdas[p].x for p in range(len(patterns)) if i in patterns[p])} times; demand is {d[i]}")
+    #     for p in range(len(patterns)):
+    #         if lambdas[p].x > 0.001 and i in patterns[p]:
+    #             vprint(f"- pattern {p}={patterns[p]} used {lambdas[p].x} times, contributes {patterns[p][i] * lambdas[p].x} items")
               
-    print(f"\nPatterns generated: {len(patterns)} (including {n} initial patterns)")    
-    print(patterns)
+    # print(f"\nPatterns generated: {len(patterns)} (including {n} initial patterns)")    
+    # print(patterns)
     
     visu_patterns(patterns, lambdas, L, l, n)
     return 
