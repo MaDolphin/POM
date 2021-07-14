@@ -1,16 +1,9 @@
 from gurobipy import *
 import networkx as nx
 import math
-import logging
 import re
 import pandas as pd
 
-#logging file
-logging.basicConfig(level = logging.INFO,format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s', filename='log', filemode='w')
-
-logger = logging.getLogger(__name__)
-
-logger.info('start')
 
 def data_load(fileName):
     listSet = []
@@ -91,26 +84,19 @@ def solve(full_path_instance):
     # curriculas Curriculas
     curriculas = dict_curricula.keys()
 
-    logger.info(f'courses: {courses}')
-    logger.info(f'df_rooms: {rooms}')
-    logger.info(f'curricula: {curriculas}')
-
     # time_slots T
     time_slots = []
     for i in range(days):
         for j in range(periods):
             time_slots.append((i,j))
 
-    logger.info(f'time slots: {time_slots}')
     # teachers Teachers
     teachers = df_courses['teacher'].unique()
-    logger.info(f'teachers: {teachers}')
 
     # teacher teachs which courses
     teacher_course_pairs = {}
     for teacher in teachers:
         teacher_course_pairs[teacher] = df_courses[df_courses['teacher'] == teacher].index.to_list()
-    logger.info(f'teacher teachs courses: {teacher_course_pairs}')
 
     # for course in which curricula
     courses_curriculas_pair = {}
@@ -122,9 +108,6 @@ def solve(full_path_instance):
                     courses_curriculas_pair[course] = [curricula]
                 else:
                     courses_curriculas_pair[course].append(curricula)
-        # courses_curriculas_pair[course] = temp_list.copy()
-        # temp_list.clear()
-    logger.info(f'courses : [curricula]: {courses_curriculas_pair}')
 
 
     # course can be take place in which rooms K_r
@@ -137,25 +120,12 @@ def solve(full_path_instance):
         # if temp_list:
         courses_rooms_pairs[k] = temp_list.copy()
         temp_list.clear()
-    logger.info(f'courses room pairs: {courses_rooms_pairs}')
-    # for rooms which course can be take place in R_r
-    # rooms_courses_pairs = {}
-    # temp_list.clear()
-    # for r in rooms:
-    #     for k in courses:
-    #         if df_courses.loc[k]['countOfStudents'] <= df_rooms.loc[r]['capacity']:
-    #             temp_list.append(k)
-    #     rooms_courses_pairs[r] = temp_list.copy()
-    #     temp_list.clear()
-
+    
+    
     courses_courses_pairs = []
     for k_1 in range(len(courses)):
         for k_2 in range(k_1+1, len(courses)):
             courses_courses_pairs.append((courses[k_1],courses[k_2]))
-
-    assert len(courses_courses_pairs) == len(courses)*(len(courses)-1)/2
-
-    logger.info(f'courses courses pairs {courses_courses_pairs}')
 
     ############################################################################################
 
@@ -251,7 +221,6 @@ def solve(full_path_instance):
             model.addConstr(y[k,i] <= quicksum(x[k,i,j] for j in range(periods)))
 
 
-
     # Constr_3: Courses taught by the same teacher can not take place in the same time-slot
     # a). with penalty model:
     # *** using 'penalty_assistant[k_1,k_2,i,j]' for the same teacher taking place in the same time-slot ***
@@ -267,7 +236,6 @@ def solve(full_path_instance):
     # for teacher in teachers:
     #     for (i,j) in time_slots:
     #         model.addConstr(quicksum(x[k, i, j] for k in teacher_course_pairs[teacher]) <= 1)
-
 
 
     # Constr_4: Courses that are part of the same curriculum can not take place in the same time-slot
@@ -287,7 +255,6 @@ def solve(full_path_instance):
     #         model.addConstr(quicksum(x[k,i,j] for k in dict_curricula[curricula]['members']) <= 1)
 
 
-
     # Constr_5: For a variety of reasons, some unavailability constraints are given,
     # such that courses <k> can not take place in some time-slots (i,j)
     # a). with penalty model:
@@ -304,7 +271,6 @@ def solve(full_path_instance):
     #     i = row[0]
     #     j = row[1]
     #     model.addConstr(x[k,i,j] == 0)
-
 
 
     ############################################################################################
@@ -363,18 +329,13 @@ def solve(full_path_instance):
             print("No solution!")
 
 
-
-
     # define a so-called "callback" which in each node of the B&C tree (not only
     # at the root node) adds violated subtour elimination constraints
     def separateRoom(model, where):
         global SEC_added
         if where == GRB.Callback.MIPSOL:
             rel = model.cbGetSolution(x)
-            # logger.info('***********')
-            # logger.info(rel)
-            # logger.info('***********')
-
+            
             def createGraph(i,j):
 
                 courses_with_time = []
@@ -423,11 +384,9 @@ def solve(full_path_instance):
                     SEC_added = SEC_added + 1
                     courses_with_time.clear()
                     a += 1
-                    # print("True")
                     break
                 else:
                     courses_with_time.clear()
-                    # print("False")
                     b += 1
                     continue
 
@@ -443,7 +402,6 @@ def solve(full_path_instance):
 
     # model.optimize()
 
-
     return model
 
-solve('comp01.ctt')
+# solve('comp05.ctt')
